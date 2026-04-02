@@ -38,8 +38,15 @@ Songs are sorted by score and the top K results are returned.
 ![alt text](image.png)
 
 
-Output of recommender:
+Example output of recommender:
 ![alt text](image-1.png)
+
+
+Phase 4 Step 1:
+![alt text](image-2.png)
+![alt text](image-3.png)
+![alt text](image-4.png)
+
 
 
 
