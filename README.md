@@ -17,19 +17,31 @@ Replace this paragraph with your own summary of what your version does.
 
 ## How The System Works
 
-Explain your design in plain language.
+Content-based recommendation works by comparing the features of songs a user has liked against all other songs in the catalog. The `UserProfile` stores a user's preferred genre, preferred mood, target energy level, and whether they prefer acoustic music. Each song is scored based on how closely its features match those preferences, and the top-scoring songs are returned as recommendations. This system uses the following features from `songs.csv`: **genre**, **mood**, **energy**, **tempo_bpm**, **valence**, **danceability**, and **acousticness**.
 
-Some prompts to answer:
+### Algorithm
 
-- What features does each `Song` use in your system
-  - For example: genre, mood, energy, tempo
-- What information does your `UserProfile` store
-- How does your `Recommender` compute a score for each song
-- How do you choose which songs to recommend
+Each song is scored against the user profile:
 
-You can include a simple diagram or bullet list if helpful.
+- **+2.0 points** if the song's genre matches the user's favorite genre
+- **+1.0 point** if the song's mood matches the user's favorite mood
+- **+0.0 to +1.0 points** for energy similarity, calculated as `1 - abs(song.energy - user.target_energy)`
 
----
+Songs are sorted by score and the top K results are returned.
+
+### Potential Biases
+
+- Genre is worth the most points, so it can overpower mood and energy in the final score.
+- The system tends to keep recommending the same genre, which can create a filter bubble.
+- Genre and mood are exact match only, so similar genres like jazz and blues are treated as completely different.
+
+![alt text](image.png)
+
+
+Output of recommender:
+![alt text](image-1.png)
+
+
 
 ## Getting Started
 
