@@ -1,59 +1,141 @@
-# 🎧 Model Card: Music Recommender Simulation
-
-## 1. Model Name  
-
-VibeMatch 1.0
+# Model Card: VibeFinderAI 2.0
 
 ---
 
-## 2. Intended Use  
+## 1. Model Name
 
-This recommender suggests songs from a small catalog based on a user's favorite genre, mood, and energy level. It is built for classroom exploration and is not meant for real users or production use.
+**VibeFinderAI 2.0**
 
----
-
-## 3. How the Model Works  
-
-Each song gets a score based on how well it matches the user's preferences. A genre match adds the most points, a mood match adds fewer, and energy similarity adds a small bonus based on how close the song's energy is to what the user wants. The songs are then sorted by score and the top results are returned.
+Successor to VibeMatch 1.0 (rule-based, Modules 1–3). The 2.0 release adds semantic retrieval and AI-generated explanations.
 
 ---
 
-## 4. Data  
+## 2. Intended Use
 
-The catalog has 18 songs across 15 genres including pop, lofi, rock, jazz, metal, classical, and hip-hop. Moods include happy, chill, intense, sad, angry, and romantic. The original starter file had 10 songs and 8 more were added to improve genre diversity. The dataset is small and does not represent the full range of musical taste or culture.
+VibeFinderAI 2.0 is a personal music discovery assistant for natural language queries. A user types a description of how they feel or what activity they are doing — *"something slow and melancholic for a rainy evening"* or *"aggressive gym music"* — and the system returns three song recommendations with plain-English explanations and a confidence rating for each pick.
 
----
-
-## 5. Strengths  
-
-The system works best when the user has a clear genre and mood preference that exists in the catalog. For example, the Chill Lofi profile gets three strong matches because there are multiple lofi songs with matching moods. The scoring is also easy to understand since every recommendation comes with a clear reason like "genre match" or "energy similarity."
+The system is intended for individual, casual use as a learning prototype. It is not designed for production deployment, does not personalize over time, and does not connect to any streaming service or external music catalog.
 
 ---
 
-## 6. Limitations and Bias 
+## 3. How It Works
 
-Genre has the most points in the scoring system, so it tends to dominate the results. Users will almost always get recommendations from their favorite genre, even if songs from other genres would be a good fit. This creates a filter bubble where the system keeps recommending the same type of music. Some genres like lofi have more songs in the catalog than others, which means users of those genres get better recommendations. Genre and mood are also exact match only, so closely related genres like pop and indie pop are treated as completely different.
+VibeFinderAI 2.0 has two cooperating layers.
 
----
+**Layer 1 — Semantic Retrieval (RAG)**
 
-## 7. Evaluation  
+Every song in the catalog is converted into a short text phrase that combines its genre, mood, and energy level — for example, *"lofi chill energy 0.42"*. A small language model called `all-MiniLM-L6-v2` (from the sentence-transformers library) reads each of those phrases and turns it into a list of numbers, called an embedding, that captures its meaning. When a user submits a query, the same model turns the query into an embedding and the system finds the songs whose embeddings are numerically closest to the query. Songs that are conceptually similar — not just keyword-identical — rank highly. This retrieval step returns the top ten candidates.
 
-Three user profiles were tested: High Energy Pop, Chill Lofi, and Intense Rock.
+**Layer 2 — AI Agent Reasoning (Gemini)**
 
-**High Energy Pop vs Chill Lofi**
-These two profiles produced completely opposite results. High Energy Pop surfaced bright, fast songs like Sunrise City while Chill Lofi returned quiet, slow songs like Library Rain and Midnight Coding. The genre weight is what drives this split. Since genre is worth the most points, each profile stayed firmly in its own corner of the catalog.
+The ten candidates and the original user query are handed to Google's Gemini 2.0 Flash language model. Gemini reads the full list and reasons about which three are the best fit. For each of its three picks it writes one or two sentences explaining the choice in plain language, assigns a confidence score between 0 and 1 to reflect how certain it is, and flags any pick it is unsure about. The response is required to come back as structured JSON so that the application can parse it reliably.
 
-**Chill Lofi vs Intense Rock**
-Both profiles got their best genre match at the top of the list, but the Intense Rock profile only had one rock song in the catalog, Storm Runner, which scored a perfect 4.0. Chill Lofi had three lofi songs to fill the top spots. After the genre matches ran out, the Rock profile had to fall back on mood and energy alone, which shows how much the results depend on how many songs exist for each genre.
+**Fallback**
 
----
-
-## 8. Future Work  
-
-It would help to add more songs per genre so every user gets meaningful results. The system could also use tempo and valence in the score instead of just genre, mood, and energy. Adding some diversity so the top results are not all the same genre would also make recommendations feel more interesting.
+If the Gemini call fails for any reason — network error, malformed output, quota limit — the system quietly falls back to the original rule-based scorer from VibeMatch 1.0. It scores every candidate on genre, mood, and energy match, returns the top three, and marks all of them as uncertain. The failure is written to the session log but no error is shown to the user.
 
 ---
 
-## 9. Personal Reflection  
+## 4. Data
 
-Building this showed how much a simple scoring rule controls what a user sees, and changing one weight can change the entire results. The biggest learning moment was seeing how genre dominance creates a filter bubble without even trying to. AI tools helped with writing and math but the score calculations always needed a double check. It was surprising that just three rules could produce results that actually feel like real recommendations. Next steps would be adding more songs per genre and building the user profile from listening history instead of typed input.
+The catalog is `data/songs.csv`, a hand-curated file of **18 songs**. The original starter file shipped with 10 songs and 8 more were added to improve genre diversity during the Module 1–3 phase.
+
+**Genres represented:** pop, lofi, rock, ambient, jazz, synthwave, indie pop, classical, hip-hop, r&b, country, metal, reggae, blues, electronic
+
+**Moods represented:** happy, chill, intense, focused, relaxed, moody, melancholic, confident, romantic, nostalgic, angry, uplifting, sad, dreamy
+
+**Numeric features per song:** `energy` (0–1), `tempo_bpm`, `valence` (0–1), `danceability` (0–1), `acousticness` (0–1)
+
+**Limitations of the data:**
+- 18 songs is an extremely small catalog. Most genres have only one or two representatives, so recommendation diversity is structurally limited.
+- All songs are fictional with invented artist names. The catalog does not reflect any real chart, era, or cultural moment.
+- Genre and mood labels were assigned by the project author and reflect one person's categorization conventions.
+- The catalog skews toward English-language Western genres. Non-Western traditions — Afrobeats, K-pop, cumbia, qawwali, etc. — are completely absent.
+- No demographic data was collected and no real listening history informed which songs were included.
+
+---
+
+## 5. Strengths
+
+**Semantic understanding.** The RAG layer finds musically relevant songs even when the user's phrasing shares no exact words with catalog labels. A query like *"music for a 3am drive"* can surface synthwave and ambient songs without any rule encoding that relationship.
+
+**Natural language queries.** Users are not required to know the catalog's genre or mood vocabulary. Any freeform description can serve as input, lowering the barrier compared to the original `UserProfile` struct.
+
+**Explainability.** Every recommendation comes with a generated explanation that connects the song's attributes to the user's query in plain language. This is more useful than a numeric score because it tells the user *why* a song fits, not just *how much*.
+
+**Self-reported uncertainty.** Gemini flags recommendations it is not confident about. The `[UNCERTAIN]` tag in the output lets users calibrate their trust rather than treating every pick as equally authoritative.
+
+**Graceful fallback.** The system never returns an error to the user. If the AI layer fails, the rule-based scorer takes over silently, ensuring the application always produces output.
+
+---
+
+## 6. Limitations and Bias
+
+**Small catalog.** With only 18 songs, the retriever often surfaces the same small set of candidates across different queries. Results for less common genres — blues, reggae, classical — will be weak because there is only one song per genre.
+
+**English-only queries.** The embedding model was trained primarily on English text. Non-English queries may embed poorly and produce irrelevant retrievals. The catalog itself contains no non-English songs, compounding this limitation.
+
+**Western music bias.** The catalog covers genres almost entirely from North American and European traditions. Users looking for music from other cultural contexts will find nothing relevant.
+
+**LLM hallucination risk.** Gemini generates explanations based on the structured song attributes it is given, but it is a generative model and may produce descriptions that sound plausible but do not accurately reflect the song. It cannot listen to the music; it only reads metadata.
+
+**No long-term personalization.** The system does not learn from a user's past interactions. Each session starts from scratch. Two users with completely different tastes receive recommendations driven entirely by their query text, not any history.
+
+**Genre and mood label brittleness.** The RAG embeddings are built from the catalog's genre and mood labels. If a song was labeled inconsistently (e.g., tagging an energetic track as "chill"), the embedding will mislead the retriever.
+
+**Catalog size limits retrieval quality.** Requesting `k=10` candidates from an 18-song catalog means more than half of all songs are always retrieved regardless of semantic relevance. Gemini then selects from this large fraction, reducing the value of the retrieval step.
+
+---
+
+## 7. Evaluation
+
+**Test suite**
+
+Five automated tests in `tests/test_ai_system.py` cover the new components:
+
+| Test | Result |
+|---|---|
+| RAG retriever returns exactly K results | Pass |
+| Fallback triggers when Gemini raises an exception (mocked) | Pass |
+| Fallback triggers when Gemini returns invalid JSON (mocked) | Pass |
+| Confidence scores are floats in [0.0, 1.0] | Pass |
+| Log file is written to disk | Pass |
+| Full pipeline (RAG + mocked agent) returns non-empty results for 3 hardcoded queries | Pass |
+
+All six test cases pass. The Gemini model itself is mocked in every test that calls the agent so the suite runs offline and does not require a live API key.
+
+**Manual evaluation**
+
+Three representative queries were tested against the live system:
+
+- *"something chill to study late at night"* — retrieved lofi and ambient tracks; Gemini correctly identified them as study-appropriate and explained the energy and tempo rationale.
+- *"aggressive and fast for the gym"* — retrieved metal, pop-intense, and rock tracks; confidence scores were high (0.83–0.97), matching expectation.
+- *"feeling nostalgic and a little melancholic tonight"* — retrieved country, blues, and classical; Gemini flagged the classical pick as uncertain, which was appropriate given the weaker semantic connection to "nostalgic."
+
+The fallback path was tested by temporarily revoking the API key; the system returned rule-based results with `uncertain=True` on all three picks and logged the fallback event, as expected.
+
+---
+
+## 8. AI Collaboration
+
+**Instance where AI gave a helpful suggestion**
+
+During development of the Gemini prompt, the initial draft asked the model to return recommendations in a plain numbered list. The model's outputs were readable but inconsistent in format — sometimes including extra commentary, sometimes returning Markdown, sometimes changing field names between calls. On suggestion from Claude (used as a coding assistant), the prompt was restructured to include an explicit JSON schema example and the instruction "Respond ONLY with valid JSON — no markdown, no extra text." This change made the outputs reliably parseable and reduced the fallback trigger rate in manual testing from roughly one-in-five calls to zero across ten consecutive tests.
+
+**Instance where AI gave a flawed suggestion**
+
+When designing the fallback logic, Claude initially suggested using the user's natural language query to extract genre and mood keywords via a second LLM call, then building a structured `UserProfile` from those keywords to pass into the rule-based scorer. The intention was to make the fallback smarter. In practice this was the wrong approach: the fallback exists precisely because the AI layer is unavailable or unreliable. Adding another LLM call inside the fallback path defeats the entire purpose — if Gemini is down, a keyword-extraction call to the same service will also fail. The suggestion was rejected in favor of a simple neutral `UserProfile` (target energy 0.5, empty genre and mood) that always works without any AI dependency.
+
+---
+
+## 9. Future Work
+
+**Larger catalog.** The most impactful single improvement would be a real music dataset — even a few thousand tracks would give the retriever enough variety to surface meaningfully different candidates for different queries. Public datasets like the Million Song Dataset or FMA (Free Music Archive) are natural candidates.
+
+**User listening history.** The current system is stateless. Adding a lightweight preference model — even just tracking which recommendations a user accepts or skips — would allow the system to personalize over time without requiring an explicit profile setup.
+
+**Multi-modal features.** Song metadata is a proxy for the actual audio experience. Incorporating audio embeddings (e.g., from a model trained on mel-spectrograms) would let the retriever match on sonic texture — timbre, instrumentation, rhythm feel — rather than relying on text labels that are inherently imprecise.
+
+**Query refinement loop.** Rather than a single-shot query → recommendations flow, the agent could ask one clarifying question when a query is ambiguous (e.g., *"Did you mean energetic electronic or something more mellow?"*) before committing to picks. This is a natural extension of the agentic pattern already in place.
+
+**Structured confidence calibration.** The current confidence scores come from Gemini's self-report, which is not calibrated against any ground truth. A future version could compare Gemini's confidence scores against held-out user ratings to measure whether high-confidence picks actually satisfy users at a higher rate than low-confidence ones.
