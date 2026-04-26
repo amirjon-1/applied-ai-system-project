@@ -3,7 +3,7 @@
 > **Base project:** Music Recommender Simulation (Modules 1–3)
 > **Extension:** RAG semantic retrieval + Gemini agentic reasoning (Module 4+)
 
-Demo video: [TO BE ADDED]
+Demo video: https://www.loom.com/share/dd88b75aa0a24fd883dabafc401089be
 
 ---
 
